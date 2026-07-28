@@ -6,7 +6,7 @@ from src.database import engine
 
 def get_total_customers():
     query="""
-    SELECT COUNT(*)
+    SELECT COUNT(DISTINCT customer_unique_id)
     AS 
     total_customers
     FROM customers
@@ -68,6 +68,56 @@ def get_avg_review_score():
 
 
 
+def get_monthly_sales():
+    query="""
+
+    SELECT DATE_TRUNC('month',o.order_purchase_timestamp) AS month,
+    SUM (op.payment_value) AS monthly_sales
+    FROM orders o
+    JOIN order_payments op
+    ON o.order_id=op.order_id
+    WHERE o.order_purchase_timestamp < '2018-09-01'
+    GROUP BY DATE_TRUNC('month',o.order_purchase_timestamp)
+    ORDER BY month
+
+    """
+
+    df=pd.read_sql_query(query,con=engine)
+    return df
+
+
+def get_top_10_categories():
+    query="""
+    SELECT p.product_category_name, COUNT(*) AS order_count
+    FROM order_items oi
+    JOIN products p
+    ON oi.product_id=p.product_id
+    GROUP BY p.product_category_name
+    ORDER BY order_count DESC
+    LIMIT 10
+
+    """
+
+    df=pd.read_sql_query(query,con=engine)
+    return df
+
+
+
+
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
-    print(get_total_customers())
+    print("Toplam müşteri:", get_total_customers())
+    print("Toplam sipariş:", get_total_orders())
+    print("Toplam satış:", get_total_sales())
+    print("Ortalama puan:", get_avg_review_score())
+    print(get_monthly_sales().head())
+    print(get_top_10_categories())
+
