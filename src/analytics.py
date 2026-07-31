@@ -106,10 +106,46 @@ def get_top_10_categories():
 
 
 
+def get_payment_methods():
+    query="""
+    SELECT payment_type, COUNT(*) AS payment_count
+    FROM order_payments
+    GROUP BY payment_type
+    ORDER BY payment_count DESC
+
+    """
+    df=pd.read_sql_query(query,con=engine)
+    return df
 
 
 
 
+def get_review_score_distribution():
+    query="""
+    SELECT review_score, COUNT(*) AS review_count
+    FROM order_reviews
+    GROUP BY review_score
+    ORDER BY review_score
+
+    """
+    df=pd.read_sql_query(query,con=engine)
+    return df
+
+
+
+def get_orders_by_state():
+    query="""
+    SELECT c.customer_state, COUNT(*) AS order_count
+    FROM orders o
+    JOIN customers c
+    ON o.customer_id=c.customer_id
+    GROUP BY c.customer_state
+    ORDER BY order_count DESC
+    LIMIT 10
+
+    """
+    df=pd.read_sql_query(query,con=engine)
+    return df
 
 
 
@@ -120,4 +156,7 @@ if __name__ == "__main__":
     print("Ortalama puan:", get_avg_review_score())
     print(get_monthly_sales().head())
     print(get_top_10_categories())
+    print(get_payment_methods())
+    print(get_review_score_distribution())
+    print(get_orders_by_state())
 
