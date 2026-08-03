@@ -2,11 +2,10 @@ import streamlit as st
 import plotly.express as px
 from styles import load_css
 from components import show_header, show_kpi_cards
-from src.ai.schema import get_database_schema
-from src.ai.sql_agent import create_sql_prompt
 from src.ai.sql_agent import generate_sql, execute_sql
 from src.ai.analyst_agent import analyze_data
-
+from src.ai.history import save_query_history
+from src.ai.chart_selector import create_auto_chart
 
 from src.analytics import (
     get_total_customers,
@@ -165,10 +164,52 @@ with tab2:
 with tab3:
     st.subheader("🤖 AI Veri Analisti")
 
-    question = st.text_input(
-        "Sorunuzu yazın"
-    )
+    st.markdown("#### 💡 Örnek Sorular")
 
+    example_col1, example_col2 = st.columns(2)
+
+    with example_col1:
+        if st.button(
+            "En çok sipariş veren 5 şehir",
+            key="example_top_cities",
+            use_container_width=True,
+        ):
+            st.session_state["ai_question"] = (
+                "En çok sipariş veren 5 şehir hangileri?"
+            )
+
+        if st.button(
+            "Aylık satış trendini göster",
+            key="example_monthly_sales",
+            use_container_width=True,
+        ):
+            st.session_state["ai_question"] = (
+                "Aylara göre toplam satış trendini göster."
+            )
+
+    with example_col2:
+        if st.button(
+            "En yüksek ciro yapan kategoriler",
+            key="example_top_revenue_categories",
+            use_container_width=True,
+        ):
+            st.session_state["ai_question"] = (
+                "En yüksek ciro yapan ilk 10 ürün kategorisini göster."
+            )
+
+        if st.button(
+            "En düşük puanlı kategoriler",
+            key="example_low_rated_categories",
+            use_container_width=True,
+        ):
+            st.session_state["ai_question"] = (
+                "Ortalama değerlendirme puanı en düşük 10 ürün kategorisini göster."
+            )
+
+    question = st.text_input(
+        "Sorunuzu yazın",
+        key="ai_question",
+    )
 
     if st.button("Analiz Et"):
 
@@ -183,12 +224,33 @@ with tab3:
 
                     df = execute_sql(sql)
 
+                    auto_chart = create_auto_chart(df)
+
                     if df.empty:
                         analysis = None
+
+                        save_query_history(
+                            question=question,
+                            generated_sql=sql,
+                            result_data=[],
+                            analysis=None,
+                            status="empty",
+                        )
+
                     else:
                         analysis = analyze_data(
                             question,
                             df
+                        )
+
+                        save_query_history(
+                            question=question,
+                            generated_sql=sql,
+                            result_data=df.head(100).to_dict(
+                                orient="records"
+                            ),
+                            analysis=analysis,
+                            status="success",
                         )
 
                 with st.expander("📝 Oluşturulan SQL'i Göster"):
@@ -197,8 +259,21 @@ with tab3:
                 st.subheader("📊 Sorgu Sonucu")
 
                 if df.empty:
-                    st.info("Bu sorgu için herhangi bir sonuç bulunamadı.")
+                    st.info(
+                        "Bu sorgu için herhangi bir sonuç bulunamadı."
+                    )
                 else:
+            
+                    if auto_chart is not None:
+                        st.subheader("📈 Otomatik Görselleştirme")
+
+                        st.plotly_chart(
+                            auto_chart,
+                            width="stretch",
+                            key="ai_auto_chart",
+                        )
+
+                    
                     st.dataframe(
                         df,
                         use_container_width=True
@@ -208,9 +283,16 @@ with tab3:
                     st.markdown(analysis)
 
             except Exception as error:
-                st.error(
-                    "Analiz sırasında bir hata oluştu."
+                save_query_history(
+                    question=question,
+                    generated_sql=sql if "sql" in locals() else None,
+                    result_data=None,
+                    analysis=None,
+                    status="error",
+                    error_message=str(error),
                 )
+
+                st.error("Analiz sırasında bir hata oluştu.")
 
                 with st.expander("Hata detayını göster"):
                     st.code(str(error))
